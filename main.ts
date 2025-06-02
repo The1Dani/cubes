@@ -1,5 +1,5 @@
 
-// TODO: Put input for max FPS and number of boxes 
+// TODO: Add Bunny support!
 class Vector2D {
 
 
