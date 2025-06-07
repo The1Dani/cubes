@@ -1,0 +1,22 @@
+{
+  "name": "html-joy",
+  "version": "1.0.0",
+  "description": "[Cubes](https://the1dani.github.io/cubes/)",
+  "homepage": "https://github.com/The1Dani/cubes#readme",
+  "bugs": {
+    "url": "https://github.com/The1Dani/cubes/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/The1Dani/cubes.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "build": "esbuild main.ts --bundle --outfile=main.js --platform=browser",
+    "watch": "npm run build -- --watch",
+    "serve": "conc - k \"npm run watch\" \"live-server\""
+  }
+}

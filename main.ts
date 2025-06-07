@@ -1,8 +1,17 @@
 
 // TODO: Add Bunny support!
+
+
+var buf = new ArrayBuffer(4),
+  f32 = new Float32Array(buf),
+  u32 = new Uint32Array(buf);
+
+
+function sign(n: number) {
+  return n < 0 ? -1 : 1
+}
+
 class Vector2D {
-
-
   constructor(public x: number, public y: number) {
     this.x = x;
     this.y = y;
@@ -25,11 +34,22 @@ class Vector2D {
 
   }
 
+  private isq(x: number) {
+
+    return 1 / Math.sqrt(x)
+  }
+
+  direction_v() {
+    const ivel = this.isq(this.x ** 2 + this.y ** 2)
+    return this.mul(ivel)
+  }
+
 
   toString() {
     return `(${this.x}, ${this.y})`
   }
 
+  static unit = new Vector2D(1, 1)
 }
 
 class Color {
@@ -51,7 +71,6 @@ class Color {
   }
 
 }
-
 
 function getDivElementByID(id: string): HTMLDivElement {
   const el: HTMLElement | null = document.getElementById(id)
@@ -84,6 +103,7 @@ type BoxSettings = {
   pos?: Vector2D;
   color?: string;
   vel?: Vector2D;
+  gravity?: Vector2D;
 };
 
 
@@ -128,6 +148,7 @@ class MovebleBox extends Box {
 
   canvas: Canvas;
   vel: Vector2D;
+  gravity: Vector2D;
 
   getSize(): Vector2D {
     return new Vector2D(parseFloat(window.getComputedStyle(this.el).width), parseFloat(window.getComputedStyle(this.el).height))
@@ -142,7 +163,8 @@ class MovebleBox extends Box {
     super(id, settings)
     this.el = getDivElementByID(id)
     this.size = this.getSize()
-    this.vel = settings.vel || new Vector2D(1, 1)
+    this.vel = settings.vel || Vector2D.unit
+    this.gravity = settings.gravity || new Vector2D(0, 0)
     this.pos = this.getPos()
     this.canvas = canvas
   }
@@ -169,8 +191,9 @@ class MovebleBox extends Box {
     return this.inWidthAtNextPos(pos) && this.inHeightAtNextPos(pos)
   }
 
-  nextPos(vel: Vector2D): Vector2D {
-    return this.pos.add(vel)
+  nextPos(deltaTime: number): Vector2D {
+    const dx = this.vel.mul(deltaTime)
+    return this.pos.add(dx)
   }
 }
 
@@ -182,7 +205,9 @@ async function sleep(ms: number) {
 const boxSett: BoxSettings = {
   size: new Vector2D(100, 200),
   color: "blue",
-  pos: new Vector2D(50, 50)
+  pos: Vector2D.unit.mul(50),
+  gravity: new Vector2D(0, 400),
+  vel: new Vector2D(200, 0)
 };
 
 let lastTime: number = Date.now()
@@ -191,30 +216,38 @@ let deltaTime: number
 let drawBox = (box: MovebleBox) => {
 
   box.canvas.newCanvas()
-  const dx = box.vel.mul(deltaTime)
 
-  const speedFactor = 1
+  const speedFactor = .9
+  box.vel = box.vel.add(box.gravity.mul(deltaTime))
+  const nextPos = box.nextPos(deltaTime)
 
-  const nextPos = box.nextPos(dx)
-
+  const bunny: number = -50
 
   if (box.isInCanvasAtNextPos(nextPos)) {
     box.setPos(nextPos)
 
   } else if (!box.inHeightAtNextPos(nextPos) && box.inWidthAtNextPos(nextPos)) {
-    box.vel = box.vel.mul(new Vector2D(speedFactor, -speedFactor))
-    let nf = nextPos.add(box.vel.mul(deltaTime))
-    if (!box.isInCanvasAtNextPos(nf)) {
+    box.vel = box.vel.mul(new Vector2D(1, -speedFactor))
+    if (nextPos.y - box.size.y < 0) {
       box.setPos(
-        new Vector2D(randNum(0, box.canvas.size.x - box.size.x), randNum(0, box.canvas.size.y - box.size.y))
+        new Vector2D(box.pos.x, 0)
+      )
+    } else {
+      box.vel = box.vel.add(new Vector2D(0, bunny))
+      box.setPos(
+        new Vector2D(box.pos.x, -box.size.y + box.canvas.size.y)
       )
     }
   } else if (box.inHeightAtNextPos(nextPos) && !box.inWidthAtNextPos(nextPos)) {
-    box.vel = box.vel.mul(new Vector2D(-speedFactor, speedFactor))
-    let nf = nextPos.add(box.vel.mul(deltaTime))
-    if (!box.isInCanvasAtNextPos(nf)) {
+    box.vel = box.vel.mul(new Vector2D(-speedFactor, 1))
+    if (nextPos.x < 0) {
       box.setPos(
-        new Vector2D(randNum(0, box.canvas.size.x - box.size.x), randNum(0, box.canvas.size.y - box.size.y)))
+        new Vector2D(0, box.pos.y)
+      )
+    } else {
+      box.setPos(
+        new Vector2D(-box.size.x + box.canvas.size.x, box.pos.y)
+      )
     }
   } else {
     box.vel = box.vel.mul(-speedFactor)
@@ -251,9 +284,7 @@ let main = () => {
   let speed = 5
   let newSpeed = speed
 
-  sett.vel = new Vector2D(1, 1).mul(speed * 10)
-
-  let boxArr = []
+  let boxArr: MovebleBox[] = []
 
   let newArr = (num: number): MovebleBox[] => {
 
@@ -265,7 +296,7 @@ let main = () => {
     }
 
 
-    let arr = []
+    let arr: MovebleBox[] = []
 
     for (let i = 0; i < num; i++) {
       sett.color = Color.random().toString()
@@ -277,6 +308,7 @@ let main = () => {
 
   boxArr = newArr(num)
 
+  console.log(sett.vel.direction_v().toString())
 
   let loop = () => {
 
@@ -288,12 +320,16 @@ let main = () => {
 
     if (fps_tick % frames - 1 == 0) newSpeed = (newSpeed = getInput("speed")) <= 0 ? speed : newSpeed
     if (speed != newSpeed) {
+      const newSpeedVec = sett.vel.direction_v().mul(newSpeed * 10)
       boxArr.forEach((v: MovebleBox) => {
-        v.vel = new Vector2D(1, 1).mul(newSpeed * 10)
+        v.vel = newSpeedVec
       })
       speed = newSpeed
-      sett.vel = new Vector2D(1, 1).mul(newSpeed * 10)
+      sett.vel = newSpeedVec
     }
+
+    if (fps_tick % 2 == 1)
+      document.getElementById("vel").innerHTML = "V: " + boxArr[0].vel.toString()
 
     fps_tick = (fps_tick + 1) % frames;
     const now = Date.now()
@@ -309,6 +345,7 @@ let main = () => {
         x.setColor(Color.random().toString())
       })
     }
+
 
     boxArr.forEach((x: MovebleBox) => {
       drawBox(x)
